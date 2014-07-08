@@ -2,9 +2,9 @@ import Pipes (yield, lift, (~>))
 import Pipes.Prelude (fold)
 import System.Environment (getArgs)
 import Crypto.Hash.SHA1 (hash)
-import qualified Data.ByteString as B
-import qualified Data.HashMap.Strict as H
-import qualified Data.Traversable as T
+import qualified Data.ByteString as B (ByteString, readFile)
+import qualified Data.HashMap.Strict as H (HashMap, insertWith, empty)
+import qualified Data.Foldable as F (mapM_)
 import Util.StreamDirectory (getRecursiveContents)
 
 similarFiles :: FilePath -> IO (H.HashMap B.ByteString [FilePath])
@@ -17,5 +17,4 @@ main :: IO ()
 main = do
     [dir] <- getArgs
     hashmap <- similarFiles dir
-    _ <- T.mapM (\x -> if length x > 1 then print x else return ()) hashmap
-    return ()
+    F.mapM_ (\x -> if length x > 1 then print x else return ()) hashmap
