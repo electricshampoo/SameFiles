@@ -2,6 +2,7 @@ import Pipes (yield, liftIO, (~>))
 import Pipes.Prelude (fold)
 import System.Environment (getArgs)
 import Crypto.Hash.SHA1 (hash)
+import Control.Monad (when)
 import qualified Data.ByteString as B (ByteString, readFile)
 import qualified Data.HashMap.Strict as H (HashMap, insertWith, empty)
 import qualified Data.Foldable as F (mapM_)
@@ -20,4 +21,4 @@ main :: IO ()
 main = do
     [dir] <- getArgs
     hashmap <- similarFiles dir
-    F.mapM_ (\x -> if length x > 1 then print x else return ()) hashmap
+    F.mapM_ (\x -> when (length x > 1) (print x)) hashmap
