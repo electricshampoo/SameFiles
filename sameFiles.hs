@@ -4,7 +4,7 @@ import Data.List (group, sort)
 import System.Environment (getArgs)
 import Crypto.Hash.SHA1 (hash)
 import Control.Monad (when)
-import System.IO (openFile, IOMode(ReadMode))
+import System.IO (withFile, IOMode(ReadMode))
 import qualified Data.ByteString as B (ByteString, readFile, hGetSome, readFile)
 import qualified Data.HashMap.Strict as H (HashMap, insertWith, empty)
 import qualified Data.Foldable as F (forM_)
@@ -16,9 +16,8 @@ possiblySimilarFiles n = fold (\hashmap (chunk, file) -> H.insertWith (++) chunk
         chunck <- liftIO $ getPrefix file
         yield (chunck, file) where 
 
-        getPrefix file = do
-            h <- openFile file ReadMode 
-            B.hGetSome h n
+        getPrefix file = withFile file ReadMode (flip B.hGetSome n)
+
 
 data HashPair = Pair !B.ByteString !FilePath
 
