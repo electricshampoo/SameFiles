@@ -13,13 +13,12 @@ import Util.StreamDirectory (getRecursiveContents)
 possiblySimilarFiles :: Int -> FilePath -> IO (H.HashMap B.ByteString [FilePath])
 possiblySimilarFiles n = fold (\hashmap (chunk, file) -> H.insertWith (++) chunk [file] hashmap)  H.empty id . getChunks where
     getChunks = getRecursiveContents ~> \file -> do
-        chunck <- liftIO $ getNBytes n file
-        yield (chunck, file)
+        chunck <- liftIO $ getPrefix file
+        yield (chunck, file) where 
 
-getNBytes :: Int -> FilePath -> IO B.ByteString
-getNBytes n file = do
-    h <- openFile file ReadMode 
-    B.hGetSome h n
+        getPrefix file = do
+            h <- openFile file ReadMode 
+            B.hGetSome h n
 
 data HashPair = Pair !B.ByteString !FilePath
 
@@ -32,11 +31,6 @@ instance Ord HashPair where
 instance Show HashPair where
     show (Pair _ filename) = filename
 
-getHash :: FilePath -> IO HashPair
-getHash file = do 
-    contents <- B.readFile file
-    return $! Pair (hash contents) file
-
 main :: IO ()
 main = do
     [dir, num] <- getArgs
@@ -44,6 +38,12 @@ main = do
     F.forM_ hashmap $ \x -> do
         when (sufficientlyLarge x) $ do
             pairs <- mapM getHash x
-            mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs
-    where sufficientlyLarge [_] = False --lists are never empty so avoid checking for them
-          sufficientlyLarge _ = True
+            mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs where 
+
+        sufficientlyLarge [] = False
+        sufficientlyLarge [_] = False 
+        sufficientlyLarge _ = True
+
+        getHash file = do 
+            contents <- B.readFile file
+            return $! Pair (hash contents) file
