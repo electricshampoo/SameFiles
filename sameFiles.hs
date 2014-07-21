@@ -15,9 +15,7 @@ possiblySimilarFiles n = fold (\hashmap (chunk, file) -> H.insertWith (++) chunk
     getChunks = getRecursiveContents ~> \file -> do
         chunck <- liftIO $ getPrefix file
         yield (chunck, file) where 
-
         getPrefix file = withFile file ReadMode (flip B.hGetSome n)
-
 
 data HashPair = Pair !B.ByteString !FilePath
 
