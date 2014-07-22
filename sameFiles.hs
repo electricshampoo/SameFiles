@@ -1,21 +1,24 @@
-import Pipes (yield, liftIO, (~>))
-import Pipes.Prelude (fold)
+import Pipes (liftIO, for)
+import Focus (alterM)
+import Control.Concurrent (forkIO)
+import Pipes.Core (runEffect)
 import Data.List (group, sort)
 import System.Environment (getArgs)
 import Crypto.Hash.SHA1 (hash)
+import Control.Concurrent.Async (mapConcurrently, withAsync, wait)
 import Control.Monad (when)
 import System.IO (withFile, IOMode(ReadMode))
-import qualified Data.ByteString as B (ByteString, readFile, hGetSome, readFile)
-import qualified Data.HashMap.Strict as H (HashMap, insertWith, empty)
-import qualified Data.Foldable as F (forM_)
+import Control.Concurrent.STM (atomically)
+import STMContainers.Map
+import qualified Data.ByteString as B (ByteString, readFile, hGetSome)
 import Util.StreamDirectory (getRecursiveContents)
 
-possiblySimilarFiles :: Int -> FilePath -> IO (H.HashMap B.ByteString [FilePath])
-possiblySimilarFiles n = fold (\hashmap (chunk, file) -> H.insertWith (++) chunk [file] hashmap)  H.empty id . getChunks where
-    getChunks = getRecursiveContents ~> \file -> do
-        chunck <- liftIO $ getPrefix file
-        yield (chunck, file) where 
-        getPrefix file = withFile file ReadMode (flip B.hGetSome n)
+possiblySimilarFiles :: Map B.ByteString [FilePath] -> Int -> FilePath -> IO ()
+possiblySimilarFiles hashmap n dir = runEffect . for (getRecursiveContents dir) $ \file -> liftIO . (\x -> forkIO x >> return ()) $ do
+        chunk <- withFile file ReadMode (flip B.hGetSome n)
+        let f Nothing = return $! Just $! [file]
+            f (Just list) = return $! Just $! file:list
+        atomically $! focus (alterM f) chunk hashmap
 
 data HashPair = Pair !B.ByteString !FilePath
 
@@ -29,14 +32,16 @@ instance Show HashPair where
     show (Pair _ filename) = filename
 
 main :: IO ()
-main = do
+main = (\x -> withAsync x wait) $ do
     [dir, num] <- getArgs
-    hashmap <- possiblySimilarFiles (read num) dir
-    F.forM_ hashmap $ \x -> do
-        when (sufficientlyLarge x) $ do
-            pairs <- mapM getHash x
-            mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs where 
-
+    hashmap <- atomically new
+    possiblySimilarFiles hashmap (read num) dir
+    collisions <- atomically $ foldM (\list (_, v) -> if sufficientlyLarge v then return $! v:list else return list) [] hashmap
+    _ <- flip mapConcurrently collisions $ \x -> do
+            pairs <- mapConcurrently getHash x
+            mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs
+    return ()
+    where 
         sufficientlyLarge [] = False
         sufficientlyLarge [_] = False 
         sufficientlyLarge _ = True
