@@ -1,15 +1,16 @@
 import Pipes (liftIO, for)
 import Focus (alterM)
-import Control.Concurrent (forkIO)
+import System.IO.Unsafe (unsafePerformIO)
 import Pipes.Core (runEffect)
 import Data.List (group, sort)
+import Control.Concurrent (forkIO)
 import System.Environment (getArgs)
 import Crypto.Hash.SHA1 (hash)
-import Control.Concurrent.Async (mapConcurrently, withAsync, wait)
+import Control.Concurrent.Async (mapConcurrently, wait, withAsync)
 import Control.Monad (when)
 import System.IO (withFile, IOMode(ReadMode))
 import Control.Concurrent.STM (atomically)
-import STMContainers.Map
+import STMContainers.Map (Map, focus, new, foldM)
 import qualified Data.ByteString as B (ByteString, readFile, hGetSome)
 import Util.StreamDirectory (getRecursiveContents)
 
@@ -36,12 +37,13 @@ main = (\x -> withAsync x wait) $ do
     [dir, num] <- getArgs
     hashmap <- atomically new
     possiblySimilarFiles hashmap (read num) dir
-    collisions <- atomically $ foldM (\list (_, v) -> if sufficientlyLarge v then return $! v:list else return list) [] hashmap
-    _ <- flip mapConcurrently collisions $ \x -> do
-            pairs <- mapConcurrently getHash x
-            mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs
-    return ()
+    atomically $ foldM f () hashmap
     where 
+        f _ (_,v) = when (sufficientlyLarge v) $ do
+                        return $! unsafePerformIO $ do
+                            pairs <- mapConcurrently getHash v
+                            mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs
+
         sufficientlyLarge [] = False
         sufficientlyLarge [_] = False 
         sufficientlyLarge _ = True

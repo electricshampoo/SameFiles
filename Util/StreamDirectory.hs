@@ -10,7 +10,7 @@ import System.FilePath ((</>))
 getRecursiveContents :: FilePath -> Producer FilePath IO ()
 getRecursiveContents topPath = do
     names <- lift $ getDirectoryContents topPath
-    let properNames = filter (`notElem` [".", ".."]) names
+    let properNames = filter (\x -> not $ x == "." || x == "..") names
     forM_ properNames $ \name -> do
         let path = topPath </> name
         isDirectory <- lift $ doesDirectoryExist path
