@@ -18,7 +18,7 @@ possiblySimilarFiles hashmap n dir = runEffect . for (getRecursiveContents dir) 
         chunk <- withFile file ReadMode (flip B.hGetSome n)
         let f Nothing = return $! Just $! [file]
             f (Just list) = return $! Just $! file:list
-        atomically $ focus (alterM f) chunk hashmap
+        atomically $! focus (alterM f) chunk hashmap
 
 data HashPair = Pair !B.ByteString !FilePath
 
