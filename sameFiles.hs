@@ -1,4 +1,4 @@
-import Pipes.Prelude (foldM)  
+import Pipes.Prelude (foldM)
 import Data.List (group, sort)
 import System.Environment (getArgs)
 import Crypto.Hash.MD5 (hash)
@@ -24,7 +24,7 @@ checkBytes = foldrM add empty where
             return $! Pair prefix file
         return $! foldr' (\(Pair prefix file) cmap -> alter (Just . maybe [file] (file:)) prefix cmap) collisionMap pairs
         else return collisionMap
-        
+
 data Pair = Pair {-# UNPACK #-} !B.ByteString !FilePath
 
 instance Eq Pair where
@@ -36,6 +36,10 @@ instance Ord Pair where
 instance Show Pair where
     show (Pair _ filename) = filename
 
+sufficientlyLarge :: [a] -> Bool
+sufficientlyLarge (_:_:_) = True
+sufficientlyLarge _ = False
+
 main :: IO ()
 main = do
     [dir] <- getArgs
@@ -45,11 +49,6 @@ main = do
             pairs <- mapM getHash collision
             mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs where
 
-            getHash file = do 
+            getHash file = do
                 contents <- B.readFile file
                 return $! Pair (hash contents) file
-
-sufficientlyLarge :: [a] -> Bool
-sufficientlyLarge (_:_:_) = True
-sufficientlyLarge _ = False
-
