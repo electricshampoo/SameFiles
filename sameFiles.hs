@@ -17,7 +17,7 @@ possiblySimilarFiles dir = foldM add (return empty) return $ getRecursiveContent
             f (Just list) = Just $! file:list
         return $! alter f size intmap
 
-data HashPair = Pair !B.ByteString !FilePath
+data HashPair = Pair {-# UNPACK #-} !B.ByteString !FilePath
 
 instance Eq HashPair where
     (Pair h1 _) == (Pair h2 _) = h1 == h2
@@ -31,15 +31,15 @@ instance Show HashPair where
 main :: IO ()
 main = do
     [dir] <- getArgs
-    intmap <- possiblySimilarFiles dir
-    forM_ intmap $ \collisions -> do
-        when (sufficientlyLarge collisions) $ do
-            pairs <- mapM getHash collisions
+    collisionMap <- possiblySimilarFiles dir
+    forM_ collisionMap $ \collision -> do
+        when (sufficientlyLarge collision) $ do
+            pairs <- mapM getHash collision
             mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs where
 
-        sufficientlyLarge (_:_:_) = True
-        sufficientlyLarge _ = False
+            sufficientlyLarge (_:_:_) = True
+            sufficientlyLarge _ = False
 
-        getHash file = do 
-            contents <- B.readFile file
-            return $! Pair (hash contents) file
+            getHash file = do 
+                contents <- B.readFile file
+                return $! Pair (hash contents) file
