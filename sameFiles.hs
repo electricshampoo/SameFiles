@@ -1,7 +1,7 @@
 import Pipes.Prelude (foldM)  
 import Data.List (group, sort)
 import System.Environment (getArgs)
-import Crypto.Hash.SHA1 (hash)
+import Crypto.Hash.MD5 (hash)
 import Control.Monad (when)
 import Data.Map.Strict (Map, empty, alter)
 import Data.Foldable (forM_)
@@ -10,11 +10,10 @@ import Util.StreamDirectory (getRecursiveContents)
 import System.Posix (getFileStatus, fileSize, FileOffset)
 
 possiblySimilarFiles ::  FilePath -> IO (Map FileOffset [FilePath])
-possiblySimilarFiles dir = foldM add (return empty) return (getRecursiveContents dir) where
+possiblySimilarFiles dir = foldM add (return empty) return $ getRecursiveContents dir where
     add intmap file = do
         size <- fmap fileSize $ getFileStatus file
-        let f :: Maybe [FilePath] -> Maybe [FilePath]
-            f Nothing = Just $! [file]
+        let f Nothing = Just $! [file]
             f (Just list) = Just $! file:list
         return $! alter f size intmap
 
@@ -38,9 +37,8 @@ main = do
             pairs <- mapM getHash collisions
             mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs where
 
-        sufficientlyLarge [] = False
-        sufficientlyLarge [_] = False 
-        sufficientlyLarge _ = True
+        sufficientlyLarge (_:_:_) = True
+        sufficientlyLarge _ = False
 
         getHash file = do 
             contents <- B.readFile file
