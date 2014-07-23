@@ -18,11 +18,12 @@ sameSizeFiles = foldM add (return empty) return . getRecursiveContents where
 
 checkBytes :: Map a [FilePath] -> IO (Map B.ByteString [FilePath])
 checkBytes = foldrM add empty where
-    add collision collisionMap = do
+    add collision collisionMap = if sufficientlyLarge collision then do
         pairs <- flip mapM collision $ \file -> do
             prefix <- withFile file ReadMode (flip B.hGetSome 64)
             return $! Pair prefix file
         return $! foldr' (\(Pair prefix file) cmap -> alter (Just . maybe [file] (file:)) prefix cmap) collisionMap pairs
+        else return collisionMap
         
 data Pair = Pair {-# UNPACK #-} !B.ByteString !FilePath
 
@@ -44,9 +45,11 @@ main = do
             pairs <- mapM getHash collision
             mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs where
 
-            sufficientlyLarge (_:_:_) = True
-            sufficientlyLarge _ = False
-
             getHash file = do 
                 contents <- B.readFile file
                 return $! Pair (hash contents) file
+
+sufficientlyLarge :: [a] -> Bool
+sufficientlyLarge (_:_:_) = True
+sufficientlyLarge _ = False
+
