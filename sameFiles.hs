@@ -3,8 +3,9 @@ import Data.List (group, sort)
 import System.Environment (getArgs)
 import Crypto.Hash.MD5 (hash)
 import Control.Monad (when)
+import Control.Concurrent.Async (mapConcurrently)
 import Data.Map.Strict (Map, empty, alter)
-import Data.Foldable (forM_, foldr', foldrM)
+import Data.Foldable (forM_, foldrM)
 import System.IO (withFile, IOMode(ReadMode))
 import qualified Data.ByteString as B (ByteString, readFile, hGetSome)
 import Util.StreamDirectory (getRecursiveContents)
@@ -18,12 +19,10 @@ sameSizeFiles = foldM add (return empty) return . getRecursiveContents where
 
 checkBytes :: Map a [FilePath] -> IO (Map B.ByteString [FilePath])
 checkBytes = foldrM add empty where
-    add collision collisionMap = if sufficientlyLarge collision then do
-        pairs <- flip mapM collision $ \file -> do
-            prefix <- withFile file ReadMode (flip B.hGetSome 64)
-            return $! Pair prefix file
-        return $! foldr' (\(Pair prefix file) cmap -> alter (Just . maybe [file] (file:)) prefix cmap) collisionMap pairs
-        else return collisionMap
+    add collision collisionMap = if sufficientlyLarge collision then foldrM go collisionMap collision else return collisionMap
+    go file cmap = do
+        prefix <- withFile file ReadMode (flip B.hGetSome 64)
+        return $! alter (Just . maybe [file] (file:)) prefix cmap
 
 data Pair = Pair {-# UNPACK #-} !B.ByteString !FilePath
 
@@ -46,8 +45,9 @@ main = do
     collisionMap <- sameSizeFiles dir >>= checkBytes
     forM_ collisionMap $ \collision -> do
         when (sufficientlyLarge collision) $ do
-            pairs <- mapM getHash collision
-            mapM_ (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs where
+            pairs <- mapConcurrently getHash collision
+            mapConcurrently (\y -> when (sufficientlyLarge y) (print y)) . group . sort $ pairs
+            return () where
 
             getHash file = do
                 contents <- B.readFile file
