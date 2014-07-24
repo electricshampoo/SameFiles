@@ -5,6 +5,7 @@ import Crypto.Hash.MD5 (hash)
 import Control.Monad (when)
 import Control.Concurrent.Async (mapConcurrently)
 import Data.Map.Strict (Map, empty, alter)
+import qualified Data.HashMap.Strict as H (HashMap, insertWith, empty)
 import Data.Foldable (forM_, foldrM)
 import System.IO (withFile, IOMode(ReadMode))
 import qualified Data.ByteString as B (ByteString, readFile, hGetSome)
@@ -12,17 +13,17 @@ import Util.StreamDirectory (getRecursiveContents)
 import System.Posix (getFileStatus, fileSize, FileOffset)
 
 sameSizeFiles ::  FilePath -> IO (Map FileOffset [FilePath])
-sameSizeFiles = foldM add (return empty) return . getRecursiveContents where
-    add collisionMap file = do
+sameSizeFiles = foldM insert (return empty) return . getRecursiveContents where
+    insert collisionMap file = do
         size <- fmap fileSize $ getFileStatus file
         return $! alter (Just . maybe [file] (file:)) size collisionMap
 
-checkBytes :: Map a [FilePath] -> IO (Map B.ByteString [FilePath])
-checkBytes = foldrM add empty where
-    add collision collisionMap = if sufficientlyLarge collision then foldrM go collisionMap collision else return collisionMap
+checkBytes :: Map a [FilePath] -> IO (H.HashMap B.ByteString [FilePath])
+checkBytes = foldrM insert H.empty where
+    insert collision collisionMap = if sufficientlyLarge collision then foldrM go collisionMap collision else return collisionMap
     go file cmap = do
         prefix <- withFile file ReadMode (flip B.hGetSome 64)
-        return $! alter (Just . maybe [file] (file:)) prefix cmap
+        return $! H.insertWith (\_ -> (file:)) prefix [file] cmap
 
 data Pair = Pair {-# UNPACK #-} !B.ByteString !FilePath
 
