@@ -12,7 +12,7 @@ import qualified Data.ByteString as B (ByteString, readFile, hGetSome)
 import Util.StreamDirectory (getRecursiveContents)
 import System.Posix (getFileStatus, fileSize, FileOffset)
 
-sameSizeFiles ::  FilePath -> IO (Map FileOffset [FilePath])
+sameSizeFiles :: FilePath -> IO (Map FileOffset [FilePath])
 sameSizeFiles = foldM insert (return empty) return . getRecursiveContents where
     insert collisionMap file = do
         size <- fmap fileSize $ getFileStatus file
